@@ -6,9 +6,14 @@ var Game = function () {
     this.openCards = [];
     this.matchCards = [];
     this._move = 0;
+    this._time = 0;
+    this.timer = null;
+    this._result = 1;
 };
 Game.prototype = {
     init: function () {
+        this.logTime();
+        this.setResult();
         // attach event listener function to restart button.
         let restart_button = document.getElementsByClassName("restart")[0];
         restart_button.onclick = function (game) {
@@ -28,7 +33,7 @@ Game.prototype = {
                 };
             }(this);
             this.cards.push(card);
-        };
+        }
     },
     openCard: function (card) {
         this.setMove(this._move + 1);
@@ -37,13 +42,21 @@ Game.prototype = {
         if (this.openCards.length == 2) {
             let card1 = this.openCards[0];
             let card2 = this.openCards[1];
-            if (match(card1, card2)) {
+            if (this.match(card1, card2)) {
                 this.matchCards.push(card1, card2);
                 card1.matched();
                 card2.matched();
                 if (this.isWin()) {
+                    clearTimeout(this.timer);
+                    this.socre();
+                    let alertStr = "win!!! score is "+this._result;
+                    alertStr += " stars,spend "+this._time;
+                    alertStr += " seconds . try again?"
                     setTimeout(() => {
-                        alert("win!!");
+                        let feedback = confirm(alertStr);
+                        if (feedback) {
+                            this.restart();
+                        }
                     }, 1000);
                 }
             } else {
@@ -59,6 +72,7 @@ Game.prototype = {
         return this.cards.length == this.matchCards.length;
     },
     restart: function () {
+        clearTimeout(this.timer)
         for (let i = 0; i < this.cards.length; i++) {
             const card = this.cards[i];
             card.recover();
@@ -66,10 +80,50 @@ Game.prototype = {
         this.openCards = [];
         this.matchCards = [];
         this.setMove(0);
+        this._time = 0;
+        this.setTimes(this._time);
+        this.logTime();
+        this.setResult();
     },
+    //set number that user has moved
     setMove: function (num) {
         this._move = num;
         document.getElementsByClassName("moves")[0].textContent = this._move;
+    },
+    //match two cards
+    match: function (card0, card1) {
+        return card0.symbol == card1.symbol;
+    },
+    //星级评定
+    socre: function () {
+        if (this._move <= 30) {
+            this._result = 3;
+        } else if (this._move > 30 && this._move <= 40) {
+            this._result = 2;
+        } else {
+            this._result = 1;
+        }
+    },
+    //页面星星展示
+    setResult: function () {
+        let stars = document.getElementsByClassName("stars")[0];
+        let paras = "";
+        for (let i = 0; i < this._result; i++) {
+            paras += "<li><i class='fa fa-star'></i></li>";
+        }
+        stars.innerHTML = paras;
+    },
+    //定时计数开始
+    logTime: function () {
+        this._time++;
+        this.setTimes(this._time);
+        this.timer = setTimeout(() => {
+            this.logTime();
+        }, 1000);
+    },
+    //游戏时间展示
+    setTimes: function (num) {
+        document.getElementsByClassName("times")[0].textContent = num;
     }
 };
 
@@ -108,10 +162,9 @@ function shuffle(array) {
  */
 
 
-function match(card0, card1) {
-    return card0.symbol == card1.symbol;
-}
-
+/*
+create a Card object that holds all attributes of card
+*/
 var Card = function (element) {
     this.element = element;
     this.symbol = element.children[0].classList.value;
@@ -136,6 +189,6 @@ Card.prototype = {
     }
 };
 
-
+//init game
 var game = new Game();
 game.init();
