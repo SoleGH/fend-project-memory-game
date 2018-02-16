@@ -1,21 +1,122 @@
-/*
- * Create a list that holds all of your cards
+/**
+ * GameScore abstract a game stars show in game panel.
+ * @param {int} maxScore - max score the player can get.
+ */
+var GameScore = function (maxScore = 3) {
+    this._maxScore = maxScore;
+    this.score = maxScore;
+    this._star_elements = [];
+    // add stars HTML.
+    let stars = document.getElementById("stars");
+    for (let i = 0; i < maxScore; i++) {
+        let li = document.createElement("li");
+        let star = document.createElement("i");
+        star.classList.add("fa", "fa-star");
+        this._star_elements.push(star);
+        li.appendChild(star);
+        stars.appendChild(li);
+    }
+};
+GameScore.prototype = {
+    /**
+     * @description Reset game score to max score.
+     */
+    reset: function () {
+        this._setScore(this._maxScore);
+    },
+    /**
+     * @description judge how many score the player get according to game moves.
+     * @param {int} move - Game had already moved.
+     */
+    judgeScore: function (move) {
+        let score = 1;
+        if (move <= 22) {
+            score = 3;
+        } else if (22 < move <= 35) {
+            score = 2;
+        }
+        this._setScore(score);
+    },
+    /**
+     * @description Set the game score.
+     * @param {int} score - score show in the screen.
+     */
+    _setScore: function (score) {
+        this.score = score;
+        for (let i = 0; i < this._star_elements.length; i++) {
+            const element = this._star_elements[i];
+            element.classList.remove("fa-star", "fa-star-o");
+            if (i <= score) {
+                element.classList.add("fa-star");
+            } else {
+                element.classList.add("fa-star-o");
+            }
+        }
+    }
+};
+
+/**
+ * GameTimer abstract a game timer to record how many times expired when the game begin.
+ */
+var GameTimer = function () {
+    this.seconds = 0;
+    this._element = document.getElementById("times");
+    this._timer = undefined;
+    this.isStart = false;
+}
+GameTimer.prototype = {
+    start: function () {
+        if (this._timer) {
+            throw new GameTimerError("GameTimer: cann't start a game timer when it had already started.");
+        } else {
+            this._timer = setInterval(() => {
+                this._setSeconds(this.seconds + 1);
+            }, 1000);
+            this.isStart = true;
+        }
+    },
+    stop: function () {
+        if (!this._timer) {
+            throw new GameTimerError("GameTimer: cann't stop a game timer that is already be stoped.");
+        } else {
+            clearInterval(this._timer);
+            this._timer = undefined;
+            this._setSeconds(0);
+            this.isStart = false;
+        }
+    },
+    _setSeconds: function (seconds) {
+        this.seconds = seconds;
+        this._element.textContent = seconds;
+    }
+};
+
+/**
+ * @description GameTimerError throwed when client do some exception action to GameTimer.
+ * @param {string} message - error message.
+ */
+function GameTimerError(message) {
+    this.message = message;
+};
+GameTimerError.prototype = Object.create(Error.prototype);
+GameTimerError.prototype.constructor = GameTimerError;
+
+/**
+ * Game abstract a game, controll all game action.
  */
 var Game = function () {
     this.cards = [];
     this.openCards = [];
     this.matchCards = [];
     this._move = 0;
-    this._time = 0;
-    this.timer = null;
-    this._result = 1;
+    this._timer = new GameTimer();
+    this._score = new GameScore();
+    this.isStart = false;
 };
 Game.prototype = {
     init: function () {
-        this.logTime();
-        this.setResult();
         // attach event listener function to restart button.
-        let restart_button = document.getElementsByClassName("restart")[0];
+        let restart_button = document.getElementById("restart");
         restart_button.onclick = function (game) {
             return function () {
                 game.restart();
@@ -27,6 +128,10 @@ Game.prototype = {
             let card = new Card(cards[i]);
             card.element.onclick = function (game) {
                 return function () {
+                    if (!game.isStart) {
+                        game.start();
+                    }
+
                     if (!card.isOpen) {
                         game.openCard(card);
                     }
@@ -34,30 +139,22 @@ Game.prototype = {
             }(this);
             this.cards.push(card);
         }
+        // shuffle the game deck cards.
+        this.shuffleCards();
     },
     openCard: function (card) {
-        this.setMove(this._move + 1);
         card.open();
         this.openCards.push(card);
         if (this.openCards.length == 2) {
+            this.setMove(this._move + 1);
             let card1 = this.openCards[0];
             let card2 = this.openCards[1];
-            if (this.match(card1, card2)) {
+            if (cards_match(card1, card2)) {
                 this.matchCards.push(card1, card2);
                 card1.matched();
                 card2.matched();
                 if (this.isWin()) {
-                    clearTimeout(this.timer);
-                    this.socre();
-                    let alertStr = "win!!! score is "+this._result;
-                    alertStr += " stars,spend "+this._time;
-                    alertStr += " seconds . try again?"
-                    setTimeout(() => {
-                        let feedback = confirm(alertStr);
-                        if (feedback) {
-                            this.restart();
-                        }
-                    }, 1000);
+                    this.showResult();
                 }
             } else {
                 setTimeout(() => {
@@ -71,59 +168,58 @@ Game.prototype = {
     isWin: function () {
         return this.cards.length == this.matchCards.length;
     },
+    start: function () {
+        this._timer.start();
+        this.isStart = true;
+    },
+    /**
+     * @description restart reset the game state to init.
+     */
     restart: function () {
-        clearTimeout(this.timer)
+        this._score.reset();
+        this._timer.stop();
+        this.setMove(0);
         for (let i = 0; i < this.cards.length; i++) {
             const card = this.cards[i];
             card.recover();
         }
         this.openCards = [];
         this.matchCards = [];
-        this.setMove(0);
-        this._time = 0;
-        this.setTimes(this._time);
-        this.logTime();
-        this.setResult();
+        this.isStart = false;
+        this.shuffleCards();
     },
-    //set number that user has moved
+    /**
+     * @description set number that user has moved.
+     * @param {int} num - number of player have moved.
+     */
     setMove: function (num) {
         this._move = num;
-        document.getElementsByClassName("moves")[0].textContent = this._move;
+        document.getElementById("moves").textContent = this._move;
+        this._score.judgeScore(num);
     },
-    //match two cards
-    match: function (card0, card1) {
-        return card0.symbol == card1.symbol;
-    },
-    //星级评定
-    socre: function () {
-        if (this._move <= 30) {
-            this._result = 3;
-        } else if (this._move > 30 && this._move <= 40) {
-            this._result = 2;
-        } else {
-            this._result = 1;
+    /**
+     * @description Show result on the screen.
+     */
+    showResult: function () {
+        let alertStr = "win!!! score is " + this._score.score;
+        alertStr += " stars,spend " + this._timer.seconds;
+        alertStr += " seconds . try again?"
+        let feedback = confirm(alertStr);
+        if (feedback) {
+            this.restart();
         }
     },
-    //页面星星展示
-    setResult: function () {
-        let stars = document.getElementsByClassName("stars")[0];
-        let paras = "";
-        for (let i = 0; i < this._result; i++) {
-            paras += "<li><i class='fa fa-star'></i></li>";
+    /**
+     * @description shuffle the game deck cards.
+     */
+    shuffleCards: function () {
+        let deck = document.getElementById("deck");
+        let shuffled_cards = shuffle([].slice.call(deck.children));
+        deck.innerHTML = "";
+        for (let i = 0; i < shuffled_cards.length; i++) {
+            const new_card = shuffled_cards[i];
+            deck.appendChild(new_card);
         }
-        stars.innerHTML = paras;
-    },
-    //定时计数开始
-    logTime: function () {
-        this._time++;
-        this.setTimes(this._time);
-        this.timer = setTimeout(() => {
-            this.logTime();
-        }, 1000);
-    },
-    //游戏时间展示
-    setTimes: function (num) {
-        document.getElementsByClassName("times")[0].textContent = num;
     }
 };
 
@@ -163,7 +259,7 @@ function shuffle(array) {
 
 
 /*
-create a Card object that holds all attributes of card
+ * Card object holds all attributes of a card.
 */
 var Card = function (element) {
     this.element = element;
@@ -189,6 +285,40 @@ Card.prototype = {
     }
 };
 
-//init game
-var game = new Game();
-game.init();
+/**
+ * TODO(hexin): AnimateCard add some animate effect to normal Card.
+ * @param {HTML element} element
+ */
+// var AnimateCard = function (element) {
+//     Card.call(this, element);
+// }
+// AnimateCard.prototype = Object.create(Card.prototype);
+// AnimateCard.prototype.open = function () {
+//     super.open();
+// };
+// AnimateCard.prototype.close = function () {
+//     super.close();
+// };
+// AnimateCard.prototype.matched = function () {
+//     super.matched();
+// }
+// AnimateCard.prototype.constructor = AnimateCard;
+
+/**
+ * @description Whether two cards symbol matched.
+ * @param {Card} card1
+ * @param {Card} card2
+ * @returns {boolean} Return true if two cards symbol is matched else false.
+ */
+function cards_match(card1, card2) {
+    return card1.symbol == card2.symbol;
+}
+
+// launcher game
+function launcherGame() {
+    var game = new Game();
+    game.init();
+}
+
+launcherGame();
+
