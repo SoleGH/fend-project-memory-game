@@ -30,10 +30,10 @@ GameScore.prototype = {
      */
     judgeScore: function (move) {
         let score = 1;
-        if (move <= 22) {
-            score = 3;
-        } else if (22 < move <= 35) {
+        if (10 < move && move <= 16) {
             score = 2;
+        } else if (move <= 10) {
+            score = 3;
         }
         this._setScore(score);
     },
@@ -46,7 +46,7 @@ GameScore.prototype = {
         for (let i = 0; i < this._star_elements.length; i++) {
             const element = this._star_elements[i];
             element.classList.remove("fa-star", "fa-star-o");
-            if (i <= score) {
+            if (i < score) {
                 element.classList.add("fa-star");
             } else {
                 element.classList.add("fa-star-o");
@@ -134,6 +134,7 @@ Game.prototype = {
 
                     if (!card.isOpen) {
                         game.openCard(card);
+
                     }
                 };
             }(this);
@@ -269,19 +270,19 @@ var Card = function (element) {
 Card.prototype = {
     recover: function () {
         this.isOpen = false;
-        this.element.classList.remove("open", "show", "match");
+        this.element.classList.remove("open", "show", "match", "animated", "shake");
     },
     open: function () {
         this.isOpen = true;
-        this.element.classList.add("open", "show");
+        this.element.classList.add("open", "show", "animated", "flipInY");
     },
     close: function () {
         this.isOpen = false;
-        this.element.classList.remove("open", "show");
+        this.element.classList.remove("open", "show", "animated", "flipInY");
     },
     matched: function () {
-        this.element.classList.remove("open", "show");
-        this.element.classList.add("match");
+        this.element.classList.remove("open", "show", "flipInY");
+        this.element.classList.add("match", "shake");
     }
 };
 
